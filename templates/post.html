@@ -38,6 +38,9 @@
             {{ ckeditor.config(name='comment_text') }}
             {{  wtf.quick_form(form, button_map={'submit':'primary'}) }}
 
+            {% if not current_user.is_authenticated: %}
+            <p>You need to login or register to comment</p>
+            {% endif %}
 <!--           Comments Area -->
           <div class="col-lg-8 col-md-10 mx-auto comment">
             {% for comment in post.comments %}

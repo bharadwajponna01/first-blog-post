@@ -56,6 +56,14 @@
           <li class="nav-item">
             <a class="nav-link" href="{{ url_for('contact') }}">Contact</a>
           </li>
+          {% if current_user.is_authenticated %}
+          <li class="nav-item">
+            <a class="nav-link" href="#">
+              <span><em>{{current_user.name}}</em></span>
+<!--              <img class="nav-link" id='profile-image' height='40' width='40' src="{{ url_for('static', filename='img/user.png') }}"/>-->
+            </a>
+          </li>
+          {% endif %}
         </ul>
       </div>
     </div>

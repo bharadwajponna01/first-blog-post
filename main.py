@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, flash, abort
+from flask import Flask, render_template, redirect, url_for, flash, abort, request
 from flask_bootstrap import Bootstrap
 from flask_ckeditor import CKEditor
 from datetime import date
@@ -6,11 +6,9 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
+from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm, ForgotPassword, CreateNewPassword, GenerateDummy
 from flask_gravatar import Gravatar
-
-
-
+import smtplib
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
@@ -18,10 +16,12 @@ ckeditor = CKEditor(app)
 Bootstrap(app)
 
 ##CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///F:\Bittu\courses\python_coding\pythonProject\day-69 Blog-cap-4-adding-users/blog.db'
+app.config[
+    'SQLALCHEMY_DATABASE_URI'] = 'sqlite:///F:\Bittu\courses\python_coding\pythonProject\day-69 Blog-cap-4-adding-users/blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-gravatar = Gravatar(app, size=100, rating='g', default='retro', force_default=False, force_lower=False, use_ssl=False, base_url=None)
+gravatar = Gravatar(app, size=100, rating='g', default='retro', force_default=False, force_lower=False, use_ssl=False,
+                    base_url=None)
 
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -34,7 +34,8 @@ def load_user(user_id):
 
 from functools import wraps
 
-#create admin only decorator
+
+# create admin only decorator
 def admin_only(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -42,6 +43,7 @@ def admin_only(f):
             return abort(403)
 
         return f(*args, **kwargs)
+
     return decorated_function
 
 
@@ -55,6 +57,8 @@ class User(UserMixin, db.Model):
     name = db.Column(db.String(100))
     posts = relationship('BlogPost', back_populates='author')
     comments = relationship('Comment', back_populates='comment_author')
+    dummy_password = db.Column(db.String(100), nullable=True)
+
 
 class BlogPost(db.Model):
     __tablename__ = "blog_posts"
@@ -70,6 +74,7 @@ class BlogPost(db.Model):
 
     comments = relationship("Comment", back_populates='parent_post')
 
+
 class Comment(db.Model):
     __tablename__ = "comments"
     id = db.Column(db.Integer, primary_key=True)
@@ -79,6 +84,7 @@ class Comment(db.Model):
 
     post_id = db.Column(db.Integer, db.ForeignKey('blog_posts.id'))
     parent_post = relationship("BlogPost", back_populates="comments")
+
 
 with app.app_context():
     db.create_all()
@@ -166,9 +172,19 @@ def about():
     return render_template("about.html")
 
 
-@app.route("/contact")
+@app.route("/contact", methods=["POST", "GET"])
 def contact():
-    return render_template("contact.html")
+    if request.method == "POST":
+        data = request.form
+        with smtplib.SMTP('smtp.gmail.com') as connection:
+            connection.starttls()
+            connection.login(user='bittu.ponna@gmail.com', password='rfdjirkedsuhbezy')
+            connection.sendmail(from_addr='bittu.ponna@gmail.com',
+                                to_addrs='bittu.ponna@gmail.com',
+                                msg=f"Subject:MESSAGE\n\nName:{data['name']}\nEmail:{data['email']}\n"
+                                    f"Phone NO:{data['tele']}\nMessage:{data['message']}")
+        return render_template('contact.html', msg_sent=True)
+    return render_template("contact.html", msg_sent=False)
 
 
 @app.route("/new-post", methods=["POST", "GET"])
@@ -221,6 +237,51 @@ def delete_post(post_id):
     db.session.commit()
     return redirect(url_for('get_all_posts'))
 
+
+@app.route("/forgot_password", methods=["POST", "GET"])
+def forgot_password():
+    form = ForgotPassword()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=form.email.data).first()
+        if user:
+            email = form.email.data
+            dummy = GenerateDummy()
+            dummy_password = dummy.generate_dummy_password()
+            user.dummy_password = dummy_password
+            with smtplib.SMTP(host='smtp.gmail.com') as connection:
+                connection.starttls()
+                connection.login(user='bittu.ponna@gmail.com', password='rfdjirkedsuhbezy')
+                connection.sendmail(from_addr='bittu.ponna@gmail.com',
+                                    to_addrs=email,
+                                    msg=f"Subject:Code\n\nHi:{ user.name }\n Please reset your Password by using the code: {dummy_password}")
+            db.session.commit()
+            return redirect(url_for('create_new_pass', email=email))
+
+        else:
+            flash("Email Doesn't exists, Please try again or Register Instead")
+            return redirect(url_for('forgot_password'))
+    return render_template('forgot-password.html', form=form)
+
+
+@app.route('/create-new-password', methods=["POST", "GET"])
+def create_new_pass():
+    form = CreateNewPassword()
+    if form.validate_on_submit():
+        user = User.query.filter_by(email=request.args.get('email')).first()
+        if user.dummy_password == form.email_code.data:
+            hash_and_salt_password = generate_password_hash(
+                form.new_password.data,
+                method='pbkdf2:sha256',
+                salt_length=8
+            )
+            user.password = hash_and_salt_password
+            user.dummy_password = ''
+            db.session.commit()
+            login_user(user)
+            return redirect(url_for('get_all_posts'))
+        else:
+            flash('Invalid Code, Please try Again!')
+    return render_template('create-new-password.html', form=form)
 
 if __name__ == "__main__":
     app.run(debug=True)
