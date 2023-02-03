@@ -16,8 +16,7 @@ ckeditor = CKEditor(app)
 Bootstrap(app)
 
 ##CONNECT TO DB
-app.config[
-    'SQLALCHEMY_DATABASE_URI'] = 'sqlite:///F:\Bittu\courses\python_coding\pythonProject\day-69 Blog-cap-4-adding-users/blog.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///F:\Bittu\courses\python_coding\pythonProject\day-69 Blog-cap-4-adding-users/blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 gravatar = Gravatar(app, size=100, rating='g', default='retro', force_default=False, force_lower=False, use_ssl=False,
@@ -206,7 +205,7 @@ def add_new_post():
     return render_template("make-post.html", form=form, current_user=current_user)
 
 
-@app.route("/edit-post/<int:post_id>")
+@app.route("/edit-post/<int:post_id>", methods=["POST", "GET"])
 @admin_only
 def edit_post(post_id):
     post = BlogPost.query.get(post_id)
@@ -221,7 +220,7 @@ def edit_post(post_id):
         post.title = edit_form.title.data
         post.subtitle = edit_form.subtitle.data
         post.img_url = edit_form.img_url.data
-        post.author = edit_form.author.data
+        # post.author = edit_form.author.data
         post.body = edit_form.body.data
         db.session.commit()
         return redirect(url_for("show_post", post_id=post.id))
